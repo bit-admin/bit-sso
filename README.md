@@ -20,6 +20,7 @@ bit-sso/
 ├── example.js           # Electron 应用示例
 ├── worker/
 │   └── index.js         # Cloudflare Worker 边缘函数实现
+├── test-sso.js          # SSO 登录测试工具
 ├── test-yanhekt.js      # Token 获取测试工具
 └── README.md
 ```
