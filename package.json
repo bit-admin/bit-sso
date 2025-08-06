@@ -3,10 +3,17 @@
   "version": "1.0.0",
   "description": "北京理工大学 SSO 单点登录模块",
   "main": "bit-sso.js",
-  "keywords": ["bit", "sso", "login", "authentication", "北京理工大学"],
-  "author": "Your Name",
+  "keywords": [
+    "bit",
+    "sso",
+    "login",
+    "authentication",
+    "北京理工大学"
+  ],
+  "author": "bit-admin",
   "license": "MIT",
   "dependencies": {
-    "axios": "^1.11.0"
+    "axios": "^1.11.0",
+    "crypto-js": "^4.2.0"
   }
 }
