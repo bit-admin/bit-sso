@@ -1,8 +1,7 @@
-// test-sso.js
+// bit-sso.js
+// 这是一个自给自足的模块，封装了所有与BIT SSO登录相关的逻辑。
 const axios = require('axios');
-// 使用 Node.js 内置的 URLSearchParams 来构建 application/x-www-form-urlencoded 格式的表单数据
-const { URLSearchParams } = require('url'); 
-const readline = require('readline');
+const { URLSearchParams } = require('url');
 
 // =============================================================================
 //  第一部分: 完整的 CryptoJS 库
@@ -15,29 +14,12 @@ var CryptoJS = CryptoJS || function (u, p) { var d = {}, l = d.lib = {}, s = fun
 CryptoJS.lib.Cipher || function (u) { var p = CryptoJS, d = p.lib, l = d.Base, s = d.WordArray, t = d.BufferedBlockAlgorithm, r = p.enc.Base64, w = p.algo.EvpKDF, v = d.Cipher = t.extend({ cfg: l.extend(), createEncryptor: function (e, a) { return this.create(this._ENC_XFORM_MODE, e, a) }, createDecryptor: function (e, a) { return this.create(this._DEC_XFORM_MODE, e, a) }, init: function (e, a, b) { this.cfg = this.cfg.extend(b); this._xformMode = e; this._key = a; this.reset() }, reset: function () { t.reset.call(this); this._doReset() }, process: function (e) { this._append(e); return this._process() }, finalize: function (e) { e && this._append(e); return this._doFinalize() }, keySize: 4, ivSize: 4, _ENC_XFORM_MODE: 1, _DEC_XFORM_MODE: 2, _createHelper: function (e) { return { encrypt: function (b, k, d) { return ("string" == typeof k ? c : a).encrypt(e, b, k, d) }, decrypt: function (b, k, d) { return ("string" == typeof k ? c : a).decrypt(e, b, k, d) } } } }); d.StreamCipher = v.extend({ _doFinalize: function () { return this._process(!0) }, blockSize: 1 }); var b = p.mode = {}, x = function (e, a, b) { var c = this._iv; c ? this._iv = u : c = this._prevBlock; for (var d = 0; d < b; d++)e[a + d] ^= c[d] }, q = (d.BlockCipherMode = l.extend({ createEncryptor: function (e, a) { return this.Encryptor.create(e, a) }, createDecryptor: function (e, a) { return this.Decryptor.create(e, a) }, init: function (e, a) { this._cipher = e; this._iv = a } })).extend(); q.Encryptor = q.extend({ processBlock: function (e, a) { var b = this._cipher, c = b.blockSize; x.call(this, e, a, c); b.encryptBlock(e, a); this._prevBlock = e.slice(a, a + c) } }); q.Decryptor = q.extend({ processBlock: function (e, a) { var b = this._cipher, c = b.blockSize, d = e.slice(a, a + c); b.decryptBlock(e, a); x.call(this, e, a, c); this._prevBlock = d } }); b = b.CBC = q; q = (p.pad = {}).Pkcs7 = { pad: function (a, b) { for (var c = 4 * b, c = c - a.sigBytes % c, d = c << 24 | c << 16 | c << 8 | c, l = [], n = 0; n < c; n += 4)l.push(d); c = s.create(l, c); a.concat(c) }, unpad: function (a) { a.sigBytes -= a.words[a.sigBytes - 1 >>> 2] & 255 } }; d.BlockCipher = v.extend({ cfg: v.cfg.extend({ mode: b, padding: q }), reset: function () { v.reset.call(this); var a = this.cfg, b = a.iv, a = a.mode; if (this._xformMode == this._ENC_XFORM_MODE) var c = a.createEncryptor; else c = a.createDecryptor, this._minBufferSize = 1; this._mode = c.call(a, this, b && b.words) }, _doProcessBlock: function (a, b) { this._mode.processBlock(a, b) }, _doFinalize: function () { var a = this.cfg.padding; if (this._xformMode == this._ENC_XFORM_MODE) { a.pad(this._data, this.blockSize); var b = this._process(!0) } else b = this._process(!0), a.unpad(b); return b }, blockSize: 4 }); var n = d.CipherParams = l.extend({ init: function (a) { this.mixIn(a) }, toString: function (a) { return (a || this.formatter).stringify(this) } }), b = (p.format = {}).OpenSSL = { stringify: function (a) { var b = a.ciphertext; a = a.salt; return (a ? s.create([1398893684, 1701076831]).concat(a).concat(b) : b).toString(r) }, parse: function (a) { a = r.parse(a); var b = a.words; if (1398893684 == b[0] && 1701076831 == b[1]) { var c = s.create(b.slice(2, 4)); b.splice(0, 4); a.sigBytes -= 16 } return n.create({ ciphertext: a, salt: c }) } }, a = d.SerializableCipher = l.extend({ cfg: l.extend({ format: b }), encrypt: function (a, b, c, d) { d = this.cfg.extend(d); var l = a.createEncryptor(c, d); b = l.finalize(b); l = l.cfg; return n.create({ ciphertext: b, key: c, iv: l.iv, algorithm: a, mode: l.mode, padding: l.padding, blockSize: a.blockSize, formatter: d.format }) }, decrypt: function (a, b, c, d) { d = this.cfg.extend(d); b = this._parse(b, d.format); return a.createDecryptor(c, d).finalize(b.ciphertext) }, _parse: function (a, b) { return "string" == typeof a ? b.parse(a, this) : a } }), p = (p.kdf = {}).OpenSSL = { execute: function (a, b, c, d) { d || (d = s.random(8)); a = w.create({ keySize: b + c }).compute(a, d); c = s.create(a.words.slice(b), 4 * c); a.sigBytes = 4 * b; return n.create({ key: a, iv: c, salt: d }) } }, c = d.PasswordBasedCipher = a.extend({ cfg: a.cfg.extend({ kdf: p }), encrypt: function (b, c, d, l) { l = this.cfg.extend(l); d = l.kdf.execute(d, b.keySize, b.ivSize); l.iv = d.iv; b = a.encrypt.call(this, b, c, d.key, l); b.mixIn(d); return b }, decrypt: function (b, c, d, l) { l = this.cfg.extend(l); c = this._parse(c, l.format); d = l.kdf.execute(d, b.keySize, b.ivSize, c.salt); l.iv = d.iv; return a.decrypt.call(this, b, c, d.key, l) } }) }();
 (function () { for (var u = CryptoJS, p = u.lib.BlockCipher, d = u.algo, l = [], s = [], t = [], r = [], w = [], v = [], b = [], x = [], q = [], n = [], a = [], c = 0; 256 > c; c++)a[c] = 128 > c ? c << 1 : c << 1 ^ 283; for (var e = 0, j = 0, c = 0; 256 > c; c++) { var k = j ^ j << 1 ^ j << 2 ^ j << 3 ^ j << 4, k = k >>> 8 ^ k & 255 ^ 99; l[e] = k; s[k] = e; var z = a[e], F = a[z], G = a[F], y = 257 * a[k] ^ 16843008 * k; t[e] = y << 24 | y >>> 8; r[e] = y << 16 | y >>> 16; w[e] = y << 8 | y >>> 24; v[e] = y; y = 16843009 * G ^ 65537 * F ^ 257 * z ^ 16843008 * e; b[k] = y << 24 | y >>> 8; x[k] = y << 16 | y >>> 16; q[k] = y << 8 | y >>> 24; n[k] = y; e ? (e = z ^ a[a[a[G ^ z]]], j ^= a[a[j]]) : e = j = 1 } var H = [0, 1, 2, 4, 8, 16, 32, 64, 128, 27, 54], d = d.AES = p.extend({ _doReset: function () { for (var a = this._key, c = a.words, d = a.sigBytes / 4, a = 4 * ((this._nRounds = d + 6) + 1), e = this._keySchedule = [], j = 0; j < a; j++)if (j < d) e[j] = c[j]; else { var k = e[j - 1]; j % d ? 6 < d && 4 == j % d && (k = l[k >>> 24] << 24 | l[k >>> 16 & 255] << 16 | l[k >>> 8 & 255] << 8 | l[k & 255]) : (k = k << 8 | k >>> 24, k = l[k >>> 24] << 24 | l[k >>> 16 & 255] << 16 | l[k >>> 8 & 255] << 8 | l[k & 255], k ^= H[j / d | 0] << 24); e[j] = e[j - d] ^ k } c = this._invKeySchedule = []; for (d = 0; d < a; d++) { j = a - d; k = d % 4 ? e[j] : e[j - 4]; c[d] = 4 > d || 4 >= j ? k : b[l[k >>> 24]] ^ x[l[k >>> 16 & 255]] ^ q[l[k >>> 8 & 255]] ^ n[l[k & 255]] } }, encryptBlock: function (a, b) { this._doCryptBlock(a, b, this._keySchedule, t, r, w, v, l) }, decryptBlock: function (a, c) { var d = a[c + 1]; a[c + 1] = a[c + 3]; a[c + 3] = d; this._doCryptBlock(a, c, this._invKeySchedule, b, x, q, n, s); d = a[c + 1]; a[c + 1] = a[c + 3]; a[c + 3] = d }, _doCryptBlock: function (a, b, c, d, e, j, l, f) { for (var m = this._nRounds, g = a[b] ^ c[0], h = a[b + 1] ^ c[1], k = a[b + 2] ^ c[2], n = a[b + 3] ^ c[3], p = 4, r = 1; r < m; r++)var q = d[g >>> 24] ^ e[h >>> 16 & 255] ^ j[k >>> 8 & 255] ^ l[n & 255] ^ c[p++], s = d[h >>> 24] ^ e[k >>> 16 & 255] ^ j[n >>> 8 & 255] ^ l[g & 255] ^ c[p++], t = d[k >>> 24] ^ e[n >>> 16 & 255] ^ j[g >>> 8 & 255] ^ l[h & 255] ^ c[p++], n = d[n >>> 24] ^ e[g >>> 16 & 255] ^ j[h >>> 8 & 255] ^ l[k & 255] ^ c[p++], g = q, h = s, k = t; q = (f[g >>> 24] << 24 | f[h >>> 16 & 255] << 16 | f[k >>> 8 & 255] << 8 | f[n & 255]) ^ c[p++]; s = (f[h >>> 24] << 24 | f[k >>> 16 & 255] << 16 | f[n >>> 8 & 255] << 8 | f[g & 255]) ^ c[p++]; t = (f[k >>> 24] << 24 | f[n >>> 16 & 255] << 16 | f[g >>> 8 & 255] << 8 | f[h & 255]) ^ c[p++]; n = (f[n >>> 24] << 24 | f[g >>> 16 & 255] << 16 | f[h >>> 8 & 255] << 8 | f[k & 255]) ^ c[p++]; a[b] = q; a[b + 1] = s; a[b + 2] = t; a[b + 3] = n }, keySize: 8 }); u.AES = p._createHelper(d) })();
 // 引入 ECB 模式
-(function () {
-    if (CryptoJS.mode.ECB) {
-        return;
-    }
-    var ECB = CryptoJS.lib.BlockCipherMode.extend();
-    ECB.Encryptor = ECB.extend({
-        processBlock: function (words, offset) {
-            this._cipher.encryptBlock(words, offset);
-        }
-    });
-    ECB.Decryptor = ECB.extend({
-        processBlock: function (words, offset) {
-            this._cipher.decryptBlock(words, offset);
-        }
-    });
-    CryptoJS.mode.ECB = ECB;
-})();
+(function(){ if (CryptoJS.mode.ECB) { return; } var ECB = CryptoJS.lib.BlockCipherMode.extend(); ECB.Encryptor = ECB.extend({ processBlock: function (words, offset) { this._cipher.encryptBlock(words, offset); } }); ECB.Decryptor = ECB.extend({ processBlock: function (words, offset) { this._cipher.decryptBlock(words, offset); } }); CryptoJS.mode.ECB = ECB; })();
 
 
 /**
  * 最终验证过的加密函数
- * 基于在 deploy.js 中发现的逻辑。
- * @param {string} cryptoKey 从 'login-croypto' 元素获取的密钥字符串。
+ * @param {string} cryptoKey 从 'login-croypto' 元素获取的Base64编码的密钥字符串。
  * @param {string} password 用户的明文密码。
  * @returns {string} 加密后的密码，可以直接用于提交。
  */
@@ -56,13 +38,14 @@ function encryptPassword(cryptoKey, password) {
 }
 
 // =============================================================================
-//  第二部分: 最终验证过的 SSO 登录核心逻辑
+//  第二部分: SSO 登录核心逻辑类
 // =============================================================================
 
 class SSOHandler {
     constructor(serviceUrl) {
         this.serviceUrl = serviceUrl;
         this.context = {};
+        // 创建一个独立的axios实例来管理会话，避免与Electron应用中其他网络请求冲突
         this.axiosInstance = axios.create();
     }
 
@@ -77,8 +60,8 @@ class SSOHandler {
         return html.substring(contentStart + 1, contentEnd).trim();
     }
 
+    // 初始化上下文，获取会话Cookie和页面上的动态参数
     async initContext() {
-        console.log("1. 正在访问登录页，获取会话和页面参数...");
         const API_LOGIN_PAGE = "https://sso.bit.edu.cn/cas/login";
         
         const response = await this.axiosInstance.get(API_LOGIN_PAGE, {
@@ -88,12 +71,10 @@ class SSOHandler {
         const cookies = response.headers['set-cookie'];
         if (cookies) {
             this.context.cookies = cookies.map(c => c.split(';')[0]).join('; ');
-            console.log("   > 已获取会话 Cookie:", this.context.cookies);
         } else {
             throw new Error("未能获取到初始 Cookie (JSESSIONID)。");
         }
         
-        // 使用最终确认的ID来查找参数
         const CRYPTO_KEY_ID = `id="login-croypto"`;
         const EXECUTION_KEY_ID = `id="login-page-flowkey"`;
 
@@ -103,58 +84,63 @@ class SSOHandler {
         if (!this.context.cryptoKey) {
             throw new Error("未能从页面解析到加密密钥(login-croypto)。");
         }
-        console.log("   > 已获取加密密钥。");
         if (!this.context.executionKey) {
             throw new Error("未能从页面解析到执行令牌(login-page-flowkey)。");
         }
-        console.log("   > 已获取执行令牌。");
         return true;
     }
 
+    /**
+     * 执行登录操作
+     * @param {string} username - 用户名/学号
+     * @param {string} password - 明文密码
+     * @returns {Promise<object>} 返回一个包含登录结果的对象
+     * - 成功: { success: true, cookies: [...] }
+     * - 失败: { success: false, reason: "..." }
+     */
     async doLogin(username, password) {
-        if (!this.context.cryptoKey || !this.context.executionKey) {
-            await this.initContext();
-        }
+        // 初始化上下文
+        await this.initContext();
 
-        console.log("2. 正在使用 AES/ECB 模式加密密码...");
+        // 加密密码
         const encryptedPassword = encryptPassword(this.context.cryptoKey, password);
 
         const API_LOGIN_ACTION = "https://sso.bit.edu.cn/cas/login";
 
-        // 创建一个 URLSearchParams 对象来构建 application/x-www-form-urlencoded 格式的表单数据
+        // 构建表单数据
         const params = new URLSearchParams();
-        
-        // 按照抓包获取的最终Payload，使用准确的参数名添加所有字段
         params.append('username', username);
         params.append('password', encryptedPassword);
         params.append('type', 'UsernamePassword');
         params.append('_eventId', 'submit');
         params.append('execution', this.context.executionKey);
-        params.append('croypto', this.context.cryptoKey); // 关键：参数名是 croypto
-        params.append('geolocation', ''); // 按观察结果发送空值
-        params.append('captcha_code', ''); // 按观察结果发送空值
+        params.append('croypto', this.context.cryptoKey);
+        params.append('geolocation', '');
+        params.append('captcha_code', '');
 
-        console.log("3. 正在提交 Form-Data 格式的登录请求...");
         try {
+            // 发送POST请求
             const response = await this.axiosInstance.post(
                 `${API_LOGIN_ACTION}?service=${encodeURIComponent(this.serviceUrl)}`, 
-                params, // 直接发送 URLSearchParams 对象
+                params,
                 {
                     headers: {
-                        // axios 会自动根据传入的 params 对象设置正确的 Content-Type
                         'Content-Type': 'application/x-www-form-urlencoded',
                         'Cookie': this.context.cookies,
                     },
-                    maxRedirects: 0, // 必须禁止重定向以捕获302状态码
-                    validateStatus: (status) => status >= 200 && status < 400, // 将3xx状态码视为成功
+                    maxRedirects: 0,
+                    validateStatus: (status) => status >= 200 && status < 400,
                 }
             );
             
-            // 登录成功由302重定向响应来判断
+            // 处理响应
             if (response.status === 302) {
-                return { success: true };
+                // 登录成功，返回包含认证Cookie的结果
+                return { 
+                    success: true, 
+                    cookies: response.headers['set-cookie'] 
+                };
             } else {
-                 // 新的登录页在失败时会返回JSON格式的错误信息
                 const errorReason = response.data?.message || "登录失败，但未找到明确错误原因。";
                 return { success: false, reason: errorReason };
             }
@@ -168,41 +154,5 @@ class SSOHandler {
     }
 }
 
-// =============================================================================
-//  第三部分: CLI 交互主程序
-// =============================================================================
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
-
-const question = (query) => new Promise(resolve => rl.question(query, resolve));
-
-async function main() {
-    console.log("--- BIT SSO 登录逻辑测试脚本 (最终验证版) ---");
-    
-    const username = await question('请输入您的学号: ');
-    const password = await question('请输入您的密码: ');
-
-    const serviceUrl = 'https://cbiz.yanhekt.cn/v1/cas/callback';
-    const ssoHandler = new SSOHandler(serviceUrl);
-    
-    try {
-        const result = await ssoHandler.doLogin(username, password);
-
-        if (result.success) {
-            console.log("\n✅ [成功] 登录成功！服务器返回了重定向请求。");
-            console.log("最终的加密和提交流程已验证通过，您可以将此逻辑集成到您的应用中。");
-        } else {
-            console.error("\n❌ [失败] 登录失败。");
-            console.error("   > 服务器返回原因:", result.reason);
-        }
-    } catch (error) {
-        console.error("\n🔥 [致命错误] 脚本执行过程中发生意外错误:", error.message);
-        console.error("   > 请检查您的网络连接或脚本中的URL是否正确。");
-    } finally {
-        rl.close();
-    }
-}
-
-main();
+// 导出 SSOHandler 类，使其可以在其他文件中被 require
+module.exports = SSOHandler;
